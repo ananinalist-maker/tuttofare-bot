@@ -4,6 +4,7 @@ Telegram-уведомление — основной канал доставки
 если мастер пролистал чат, заявку всегда можно достать командой /leads.
 """
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -44,6 +45,10 @@ def _conn():
 
 
 def init_db() -> None:
+    # На сервере база лежит в примонтированном томе (например /data/leads.db).
+    # Если каталога нет — создаём, иначе sqlite упадёт при старте и уронит бота.
+    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    os.makedirs(parent, exist_ok=True)
     with _conn() as conn:
         conn.executescript(SCHEMA)
 
