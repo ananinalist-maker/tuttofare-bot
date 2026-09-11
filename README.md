@@ -85,17 +85,59 @@ python test_bot.py
 
 ## Деплой на Railway
 
-1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** →
-   выбрать этот репозиторий.
-2. **Variables** → добавить `BOT_TOKEN` и `ADMIN_CHAT_ID`.
-3. **Settings → Deploy**: убедиться, что start command — `python bot.py`
-   (Railway подхватит его из `Procfile` или `railway.json` автоматически).
-4. Deploy. В логах должно появиться `Бот запущен: @имя_бота`.
+Бот развёрнут и работает: проект `tuttofare-bot`, сервис `tuttofare-bot`,
+том на 500 МБ в `/data`.
 
-**Про базу.** Файловая система Railway эфемерная: при каждом редеплое `leads.db`
-обнулится. Заявки при этом не теряются — они приходят в Telegram, это основной канал.
-Если нужна история в базе: **Settings → Volumes** → примонтировать том, например
-в `/data`, и задать переменную `DB_PATH=/data/leads.db`.
+Через CLI (так он и разворачивался):
+
+```bash
+npm install -g @railway/cli
+railway login
+railway init --name tuttofare-bot
+railway add --service tuttofare-bot
+railway variables --set "ADMIN_CHAT_ID=<ваш id>" --set "DB_PATH=/data/leads.db"
+cat .env | grep BOT_TOKEN | cut -d= -f2- | railway variables --set-from-stdin BOT_TOKEN
+railway volume add --mount-path /data
+railway up
+```
+
+Через веб-интерфейс: **New Project** → **Deploy from GitHub repo** → выбрать репозиторий →
+**Variables** → вписать `BOT_TOKEN` и `ADMIN_CHAT_ID`. Start command Railway возьмёт
+из `Procfile`.
+
+### Грабли, на которые я наступил
+
+- **Автодеплой по `git push` не работает без приложения Railway на GitHub.** Команда
+  `railway add --repo` записывает репозиторий, но вебхук не создаётся. Либо ставить
+  [Railway GitHub App](https://github.com/apps/railway-app), либо выкатывать вручную
+  через `railway up`.
+- **Два экземпляра на одном токене несовместимы.** Пока локальный бот опрашивает
+  Telegram, серверный получает `Conflict: terminated by other getUpdates request`
+  и наоборот. Перед деплоем локальный процесс надо погасить.
+- **Git Bash на Windows подменяет пути в аргументах.** `--mount-path /data` превращается
+  в `C:/Program Files/Git/data`. Лечится префиксом `MSYS_NO_PATHCONV=1`.
+- **`railway volume add` падает с `--service`.** Внутренняя ошибка CLI
+  (`panicked at volume.rs:836`). Работает без этого флага — том привязывается
+  к текущему слинкованному сервису.
+
+### Про базу
+
+Файловая система контейнера эфемерная, поэтому база вынесена на том: `DB_PATH=/data/leads.db`.
+Без тома `leads.db` обнулялся бы при каждом редеплое. Заявки при этом всё равно не терялись бы —
+они приходят в Telegram, это основной канал доставки, база нужна для `/leads` и `/stats`.
+
+### Про бесплатный тариф
+
+Бессрочного бесплатного плана у Railway больше нет — при регистрации даётся пробный
+кредит. Бот на long polling потребляет мало, но кредит конечен. Альтернативы для
+круглосуточной работы: Fly.io, Hetzner CX22 (~4 €/мес), Contabo. На бесплатном тарифе
+Render работать не будет — он усыпляет процесс, а long polling требует живого воркера.
+
+### Известный долг
+
+`railway.json` (Config as Code) объявлен устаревшим и поддерживается до 2026-12-01.
+Миграция — `railway config migrate`, создаст `.railway/railway.ts`. Сейчас деплой
+работает и через `Procfile`, так что это не срочно.
 
 **Про бесплатный тариф.** У Railway пробный кредит, не бессрочный бесплатный план.
 Бот на long polling потребляет мало, но кредит конечен. Альтернативы для круглосуточной
